@@ -1,4 +1,4 @@
-token = '5903872252:AAHWFR6Vu6YohMwb3GOi05FJLAD5no48-Tc'
+token = ''
 
 arr_faculty = ["ИТКН", "ЭкоТех", "ИНМиН", "ГИ", "ЭУПП", "ИБО", "ИНОБР", "ИИБС"]
 arr_directions = {"ИТКН": ["ИВТ", "ПМ", "БИ"]}
