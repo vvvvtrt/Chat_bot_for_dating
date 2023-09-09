@@ -9,6 +9,7 @@ from aiogram.types import ReplyKeyboardRemove, \
     InlineKeyboardMarkup, InlineKeyboardButton
 import sqlite3
 from data import *
+import json
 
 # устанавливаем уровень логирования
 logging.basicConfig(level=logging.INFO)
@@ -19,6 +20,9 @@ storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
 reg_user = {}
+queue_search = {"Подготовка к сессии": {}, "Поиск по интересам": [], "Поиск по родному городу": [],
+                "Поиск компании для прогулки": []}
+in_queue = []
 
 
 @dp.message_handler(commands=['start'])
@@ -26,21 +30,22 @@ async def start_command(message: types.Message):
     db = sqlite3.connect("user.db")
     sql = db.cursor()
 
-    sql.execute("""CREATE TABLE IF NOT EXISTS movie (
-                                        Id BIGINT,
-                                        faculty TEXT,
-                                        directions TEXT,
-                                        degree TEXT,
-                                        course INT,
-                                        name TEXT,
-                                        сity TEXT,
-                                        tg_id TEXT,
-                                        last_meeting BIGINT
-                                    )""")
+    sql.execute("""CREATE TABLE IF NOT EXISTS user (
+                                               Id BIGINT,
+                                               faculty TEXT,
+                                               directions TEXT,
+                                               degree TEXT,
+                                               course INT,
+                                               name TEXT,
+                                               city TEXT,
+                                               hobby TEXT,
+                                               tg_id TEXT,
+                                               last_meeting BIGINT
+                                           )""")
 
     db.commit()
 
-    sql.execute("SELECT * FROM movie WHERE Id=?", (int(message.chat.id),))
+    sql.execute("SELECT * FROM user WHERE Id=?", (int(message.chat.id),))
     data = sql.fetchone()
 
     if data == None:
@@ -51,14 +56,15 @@ async def start_command(message: types.Message):
             buttons.append(KeyboardButton(text=i))
         keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(*buttons)
 
-        await message.reply('Привет! \nДанный бот поможет завести тебе новые знакомства, провести хорошо время или подготовится к экзаменам')
+        await message.reply(
+            'Привет! \nДанный бот поможет завести тебе новые знакомства, провести хорошо время или подготовится к экзаменам')
         await bot.send_message(message.chat.id, 'Выбри свой факультет:', reply_markup=keyboard)
+    else:
+        await menuSearch(message)
 
-# Обработчик нажатия кнопки
-@dp.callback_query_handler(text='button_clicked')
-async def button_clicked(callback_query: types.CallbackQuery):
-    await bot.answer_callback_query(callback_query.id)
-    await bot.send_message(callback_query.from_user.id, 'Текст, который выдает бот.')
+    sql.close()
+    db.close()
+
 
 @dp.message_handler(content_types=["text"])
 async def text(message):
@@ -117,11 +123,40 @@ async def text(message):
 
         await bot.send_message(message.chat.id, '✅' + message.text)
 
+    elif message.text in arr_search:
+        if message.chat.id not in in_queue:
+            if message.text == arr_search[0]:
+                in_queue.append(message.chat.id)
+                db = sqlite3.connect("user.db")
+                sql = db.cursor()
+
+                sql.execute(f"SELECT * FROM user WHERE id = {int(message.chat.id)}")
+                data = sql.fetchone()
+
+                if data[2] in queue_search[message.text]:
+                    for i in queue_search[message.text][data[2]]:
+                        if i[1] == data[2] and i[2] == data[3] and i[3] == data[4]:
+                            await bot.send_message(message.chat.id,
+                                                   f"""Мы нашли Вам человека с которым вы можете подготовится к сессии, напишите: @{i[4]}""")
+                            await bot.send_message(i[0],
+                                                   f"""Мы нашли Вам человека с которым вы можете подготовится к сессии, напишите: @{data[8]}""")
+                            queue_search[message.text][data[2]].remove(i)
+
+                else:
+                    queue_search[message.text][data[2]] = [[message.chat.id, data[2], data[3], data[4], data[8]]]
+        else:
+            pass
+
+
     elif message.text == "✅Готово✅":
         if "hobby" not in reg_user[message.chat.id]:
             await bot.send_message(message.chat.id, 'Выбери свои интересы')
         else:
-            print(reg_user)
+            await endRegistration(message)
+            reply_markup = types.ReplyKeyboardRemove()
+            await bot.send_message(message.chat.id, 'Вы успешно зарегестрировались', reply_markup=reply_markup)
+            await menuSearch(message)
+
 
     elif message.text == "↩️Назад↩️":
         keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
@@ -146,7 +181,6 @@ async def text(message):
             await bot.send_message(message.chat.id, 'Выбери свои интересы', reply_markup=keyboard)
 
 
-
 async def directions(message):
     buttons = []
     for i in arr_directions[message.text]:
@@ -154,6 +188,73 @@ async def directions(message):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(*buttons)
 
     await bot.send_message(message.chat.id, 'Выбри специальноть:', reply_markup=keyboard)
+
+
+async def endRegistration(message):
+    db = sqlite3.connect("user.db")
+    sql = db.cursor()
+
+    sql.execute("""CREATE TABLE IF NOT EXISTS user (
+                                            Id BIGINT,
+                                            faculty TEXT,
+                                            directions TEXT,
+                                            degree TEXT,
+                                            course INT,
+                                            name TEXT,
+                                            city TEXT,
+                                            hobby TEXT,
+                                            tg_id TEXT,
+                                            last_meeting BIGINT
+                                        )""")
+
+    sql.execute('INSERT INTO user VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                (int(message.chat.id), reg_user[message.chat.id]["faculty"],
+                 reg_user[message.chat.id]["directions"], reg_user[message.chat.id]["degree"],
+                 reg_user[message.chat.id]["year"], reg_user[message.chat.id]["name"],
+                 reg_user[message.chat.id]["city"], json.dumps(reg_user[message.chat.id]["hobby"]),
+                 message.from_user.username, 0))
+
+    db.commit()
+    sql.close()
+    db.close()
+
+
+async def readSQL():
+    db = sqlite3.connect("user.db")
+    sql = db.cursor()
+
+    sql.execute("""CREATE TABLE IF NOT EXISTS user (
+                                                Id BIGINT,
+                                                faculty TEXT,
+                                                directions TEXT,
+                                                degree TEXT,
+                                                course INT,
+                                                name TEXT,
+                                                city TEXT,
+                                                hobby TEXT,
+                                                tg_id TEXT,
+                                                last_meeting BIGINT
+                                            )""")
+
+    sql.execute('SELECT * FROM user')
+    data = sql.fetchall()
+
+    for row in data:
+        print(row)
+        deserialized_array = json.loads(row[7])
+        print(deserialized_array)
+
+    sql.close()
+    db.close()
+
+
+async def menuSearch(message):
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    for i in arr_search:
+        keyboard.add(KeyboardButton(text=i))
+
+    await bot.send_message(message.chat.id, 'Выберите, с какой целью ищите', reply_markup=keyboard)
+
 
 # запускаем бота
 if __name__ == '__main__':
