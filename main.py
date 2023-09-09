@@ -199,21 +199,20 @@ async def text(message):
         async with lock:
             if message.chat.id in in_queue:
                 if in_queue[message.chat.id][-1] == 0:
-                    for i in queue_search[arr_search[0]]:
+                    for i in queue_search[arr_search[0]][in_queue[message.chat.id][2]]:
                         if i[0] == message.chat.id:
-                            queue_search[arr_search[0]].remove(i)
+                            queue_search[arr_search[0]][in_queue[message.chat.id][2]].remove(i)
                             del in_queue[message.chat.id]
-                            await bot.send_message(message.chat.id, 'Вы удалены из очереди',
-                                                   reply_markup=types.ReplyKeyboardRemove())
-                            return
-                if in_queue[message.chat.id][-1] == 2:
+
+                elif in_queue[message.chat.id][-1] == 2:
                     for i in queue_search[arr_search[2]]:
                         if i[0] == message.chat.id:
                             queue_search[arr_search[2]].remove(i)
                             del in_queue[message.chat.id]
-                            await bot.send_message(message.chat.id, 'Вы удалены из очереди',
-                                                   reply_markup=types.ReplyKeyboardRemove())
-                            return
+
+                await bot.send_message(message.chat.id, 'Вы удалены из очереди',
+                                       reply_markup=types.ReplyKeyboardRemove())
+
             else:
                 await bot.send_message(message.chat.id, 'Вас нет в очереди', reply_markup=types.ReplyKeyboardRemove())
 
