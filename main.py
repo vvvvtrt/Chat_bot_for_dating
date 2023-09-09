@@ -10,6 +10,9 @@ from aiogram.types import ReplyKeyboardRemove, \
 import sqlite3
 from data import *
 import json
+import asyncio
+
+lock = asyncio.Lock()
 
 # устанавливаем уровень логирования
 logging.basicConfig(level=logging.INFO)
@@ -22,7 +25,7 @@ dp = Dispatcher(bot, storage=storage)
 reg_user = {}
 queue_search = {"Подготовка к сессии": {}, "Поиск по интересам": [], "Поиск по родному городу": [],
                 "Поиск компании для прогулки": []}
-in_queue = []
+in_queue = {}
 
 
 @dp.message_handler(commands=['start'])
@@ -126,26 +129,94 @@ async def text(message):
     elif message.text in arr_search:
         if message.chat.id not in in_queue:
             if message.text == arr_search[0]:
-                in_queue.append(message.chat.id)
                 db = sqlite3.connect("user.db")
                 sql = db.cursor()
 
                 sql.execute(f"SELECT * FROM user WHERE id = {int(message.chat.id)}")
                 data = sql.fetchone()
 
+                in_queue[message.chat.id] = list(data) + [0]
+
                 if data[2] in queue_search[message.text]:
-                    for i in queue_search[message.text][data[2]]:
-                        if i[1] == data[2] and i[2] == data[3] and i[3] == data[4]:
-                            await bot.send_message(message.chat.id,
-                                                   f"""Мы нашли Вам человека с которым вы можете подготовится к сессии, напишите: @{i[4]}""")
-                            await bot.send_message(i[0],
-                                                   f"""Мы нашли Вам человека с которым вы можете подготовится к сессии, напишите: @{data[8]}""")
-                            queue_search[message.text][data[2]].remove(i)
+                    async with lock:
+                        for i in queue_search[message.text][data[2]]:
+                            if i[1] == data[2] and i[2] == data[3] and i[3] == data[4]:
+                                await bot.send_message(message.chat.id,
+                                                       f"""Мы нашли Вам человека с которым вы можете подготовится к сессии, напишите: @{i[4]}""",
+                                                       reply_markup=types.ReplyKeyboardRemove())
+                                await bot.send_message(i[0],
+                                                       f"""Мы нашли Вам человека с которым вы можете подготовится к сессии, напишите: @{data[8]}""",
+                                                       reply_markup=types.ReplyKeyboardRemove())
+
+                                del in_queue[i[0]]
+                                queue_search[message.text][data[2]].remove(i)
+                                del in_queue[message.chat.id]
+                                return
+
+                        queue_search[message.text][data[2]] = [[message.chat.id, data[2], data[3], data[4], data[8]]]
+                        keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton(text="Отмена"))
+                        await bot.send_message(message.chat.id, 'Вы добавлены в очередь', reply_markup=keyboard)
 
                 else:
-                    queue_search[message.text][data[2]] = [[message.chat.id, data[2], data[3], data[4], data[8]]]
+                    async with lock:
+                        queue_search[message.text][data[2]] = [[message.chat.id, data[2], data[3], data[4], data[8]]]
+                        keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton(text="Отмена"))
+                        await bot.send_message(message.chat.id, 'Вы добавлены в очередь', reply_markup=keyboard)
+
+
+            elif message.text == arr_search[2]:
+                db = sqlite3.connect("user.db")
+                sql = db.cursor()
+
+                sql.execute(f"SELECT * FROM user WHERE id = {int(message.chat.id)}")
+                data = sql.fetchone()
+                in_queue[message.chat.id] = list(data) + [2]
+
+                async with lock:
+                    for i in queue_search[arr_search[2]]:
+                        if i[1].lower() in data[6].lower() or data[6].lower() in i[1].lower():
+                            await bot.send_message(message.chat.id,
+                                                   f"""Мы нашли Вам человека из Вашего города, напишите: @{i[2]}""",
+                                                   reply_markup=types.ReplyKeyboardRemove())
+                            await bot.send_message(i[0],
+                                                   f"""Мы нашли Вам человека из Вашего города, напишите: @{data[8]}""",
+                                                   reply_markup=types.ReplyKeyboardRemove())
+
+                            del in_queue[i[0]]
+                            queue_search[message.text].remove(i)
+                            del in_queue[message.chat.id]
+                            return
+
+                    queue_search[message.text].append([message.chat.id, data[6], data[8]])
+                    keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton(text="Отмена"))
+                    await bot.send_message(message.chat.id, 'Вы добавлены в очередь', reply_markup=keyboard)
+
         else:
-            pass
+            await bot.send_message(message.chat.id, 'Вы уже в очереди')
+
+
+    elif message.text == "Отмена":
+        async with lock:
+            if message.chat.id in in_queue:
+                if in_queue[message.chat.id][-1] == 0:
+                    for i in queue_search[arr_search[0]]:
+                        if i[0] == message.chat.id:
+                            queue_search[arr_search[0]].remove(i)
+                            del in_queue[message.chat.id]
+                            await bot.send_message(message.chat.id, 'Вы удалены из очереди',
+                                                   reply_markup=types.ReplyKeyboardRemove())
+                            return
+                if in_queue[message.chat.id][-1] == 2:
+                    for i in queue_search[arr_search[2]]:
+                        if i[0] == message.chat.id:
+                            queue_search[arr_search[2]].remove(i)
+                            del in_queue[message.chat.id]
+                            await bot.send_message(message.chat.id, 'Вы удалены из очереди',
+                                                   reply_markup=types.ReplyKeyboardRemove())
+                            return
+            else:
+                await bot.send_message(message.chat.id, 'Вас нет в очереди', reply_markup=types.ReplyKeyboardRemove())
+
 
 
     elif message.text == "✅Готово✅":
