@@ -29,7 +29,7 @@ queue_search = {"Подготовка к сессии": {}, "Поиск по и�
 in_queue = {}
 
 
-@dp.message_handler(commands=['start'])
+@dp.message_handler(commands=['start', 'menu'])
 async def start_command(message: types.Message):
     db = sqlite3.connect("user.db")
     sql = db.cursor()
@@ -82,6 +82,11 @@ async def text(message):
         for j in i:
             list_hobby.append(j)
 
+    list_varia = []
+    for i in [values for values in arr_varia.values()]:
+        for j in i:
+            list_varia.append(j)
+
     if message.text in arr_faculty:
         reg_user[message.chat.id]["faculty"] = message.text
         await directions(message)
@@ -94,7 +99,7 @@ async def text(message):
             buttons.append(KeyboardButton(text=i))
         keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(*buttons)
 
-        await bot.send_message(message.chat.id, 'Выбри степень:', reply_markup=keyboard)
+        await bot.send_message(message.chat.id, 'Выбри ступень:', reply_markup=keyboard)
 
     elif message.text in arr_degree:
         reg_user[message.chat.id]["degree"] = message.text
@@ -104,7 +109,7 @@ async def text(message):
             buttons.append(KeyboardButton(text=i))
         keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(*buttons)
 
-        await bot.send_message(message.chat.id, 'Введите свой курс', reply_markup=keyboard)
+        await bot.send_message(message.chat.id, 'Выберите свой курс', reply_markup=keyboard)
 
     elif message.text in ["1", "2", "3", "4", "5"]:
         reg_user[message.chat.id]["year"] = message.text
@@ -119,7 +124,7 @@ async def text(message):
 
         await bot.send_message(message.chat.id, 'Выбери свои интересы', reply_markup=keyboard)
 
-    elif message.text in list_hobby:
+    elif message.text in list_hobby + list_varia:
         if "hobby" not in reg_user[message.chat.id]:
             reg_user[message.chat.id]["hobby"] = [message.text]
         else:
@@ -142,15 +147,15 @@ async def text(message):
                     async with lock:
                         for i in queue_search[message.text][data[2]]:
                             if i[1] == data[2] and i[2] == data[3] and i[3] == data[4]:
-                                photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
-                                await bot.send_photo(message.chat.id, photo,
-                                                       f"""Мы нашли Вам человека с которым вы можете подготовится к сессии, напишите: @{i[4]}""",
-                                                       reply_markup=types.ReplyKeyboardRemove())
-                                photo.close()
                                 photo = open(f'profile/{i[0]}.jpeg', 'rb')
+                                await bot.send_photo(message.chat.id, photo,
+                                                     f"""Мы нашли Вам человека с которым вы можете подготовится к сессии, напишите: @{i[4]}""",
+                                                     reply_markup=types.ReplyKeyboardRemove())
+                                photo.close()
+                                photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
                                 await bot.send_photo(i[0], photo,
-                                                       f"""Мы нашли Вам человека с которым вы можете подготовится к сессии, напишите: @{data[8]}""",
-                                                       reply_markup=types.ReplyKeyboardRemove())
+                                                     f"""Мы нашли Вам человека с которым вы можете подготовится к сессии, напишите: @{data[8]}""",
+                                                     reply_markup=types.ReplyKeyboardRemove())
                                 photo.close()
 
                                 del in_queue[i[0]]
@@ -178,27 +183,34 @@ async def text(message):
 
                 async with lock:
                     arr = set(json.loads(data[7]))
+                    arr_similarity = []
+                    sum_similarity = 0
                     for i in queue_search[arr_search[1]]:
-                        if len(set(i[1]) & arr) >= 3:
-                            photo = open(f'profile/{i[0]}.jpeg', 'rb')
-                            await bot.send_photo(message.chat.id, photo,
-                                                 f"""Мы нашли Вам человека с похожими интересами.\n\nОбщие интересы:\n {", ".join(list(set(i[1]) & arr))}\nнапишите: @{i[2]}""",
-                                                 reply_markup=types.ReplyKeyboardRemove())
-                            photo.close()
-                            photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
-                            await bot.send_photo(i[0], photo,
-                                                 f"""Мы нашли Вам человека с похожими интересами.\n\nОбщие интересы:\n {", ".join(list(set(i[1]) & arr))}\nнапишите: @{data[8]}""",
-                                                 reply_markup=types.ReplyKeyboardRemove())
-                            photo.close()
+                        if len(set(i[1]) & arr) > sum_similarity:
+                            arr_similarity = i
+                            sum_similarity = len(set(i[1]) & arr)
 
-                            del in_queue[i[0]]
-                            queue_search[message.text].remove(i)
-                            del in_queue[message.chat.id]
-                            return
+                    if sum_similarity:
+                        photo = open(f'profile/{arr_similarity[0]}.jpeg', 'rb')
+                        await bot.send_photo(message.chat.id, photo,
+                                             f"""Мы нашли Вам человека с похожими интересами.\n\nОбщие интересы:\n {', '.join(list(set(arr_similarity[1]) & arr))}\nнапишите: @{arr_similarity[2]}""",
+                                             reply_markup=types.ReplyKeyboardRemove())
+                        photo.close()
+                        photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
+                        await bot.send_photo(arr_similarity[0], photo,
+                                             f"""Мы нашли Вам человека с похожими интересами.\n\nОбщие интересы:\n {", ".join(list(set(arr_similarity[1]) & arr))}\nнапишите: @{data[8]}""",
+                                             reply_markup=types.ReplyKeyboardRemove())
+                        photo.close()
 
-                    queue_search[message.text].append([message.chat.id, json.loads(data[7]), data[8]])
-                    keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton(text="Отмена"))
-                    await bot.send_message(message.chat.id, 'Вы добавлены в очередь', reply_markup=keyboard)
+                        del in_queue[arr_similarity[0]]
+                        queue_search[message.text].remove(arr_similarity)
+                        del in_queue[message.chat.id]
+                        return
+
+                    else:
+                        queue_search[message.text].append([message.chat.id, json.loads(data[7]), data[8]])
+                        keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton(text="Отмена"))
+                        await bot.send_message(message.chat.id, 'Вы добавлены в очередь', reply_markup=keyboard)
 
 
 
@@ -214,15 +226,15 @@ async def text(message):
                 async with lock:
                     for i in queue_search[arr_search[2]]:
                         if i[1].lower() in data[6].lower() or data[6].lower() in i[1].lower():
-                            photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
-                            await bot.send_photo(message.chat.id, photo,
-                                                   f"""Мы нашли Вам человека из Вашего города, напишите: @{i[2]}""",
-                                                   reply_markup=types.ReplyKeyboardRemove())
-                            photo.close()
                             photo = open(f'profile/{i[0]}.jpeg', 'rb')
+                            await bot.send_photo(message.chat.id, photo,
+                                                 f"""Мы нашли Вам человека из Вашего родного города, напишите: @{i[2]}""",
+                                                 reply_markup=types.ReplyKeyboardRemove())
+                            photo.close()
+                            photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
                             await bot.send_photo(i[0], photo,
-                                                   f"""Мы нашли Вам человека из Вашего города, напишите: @{data[8]}""",
-                                                   reply_markup=types.ReplyKeyboardRemove())
+                                                 f"""Мы нашли Вам человека из Вашего родного города, напишите: @{data[8]}""",
+                                                 reply_markup=types.ReplyKeyboardRemove())
 
                             photo.close()
                             del in_queue[i[0]]
@@ -234,8 +246,52 @@ async def text(message):
                     keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton(text="Отмена"))
                     await bot.send_message(message.chat.id, 'Вы добавлены в очередь', reply_markup=keyboard)
 
+            elif message.text == arr_search[3]:
+                keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+                for i in arr_place:
+                    keyboard.add(KeyboardButton(text=i))
+                keyboard.add(KeyboardButton(text="Отмена"))
+                await bot.send_message(message.chat.id, 'Выберите место для отдыха', reply_markup=keyboard)
+
         else:
-            await bot.send_message(message.chat.id, 'Вы уже в очереди')
+            keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton(text="Отмена"))
+            await bot.send_message(message.chat.id, 'Вы уже в очереди', reply_markup=keyboard)
+
+    elif message.text in arr_place:
+        db = sqlite3.connect("user.db")
+        sql = db.cursor()
+
+        sql.execute(f"SELECT * FROM user WHERE id = {int(message.chat.id)}")
+        data = sql.fetchone()
+
+        async with lock:
+            if message.chat.id not in in_queue:
+                in_queue[message.chat.id] = list(data) + [3]
+
+                for i in queue_search[arr_search[3]]:
+                    if i[1] == message.text:
+                        photo = open(f'profile/{i[0]}.jpeg', 'rb')
+                        await bot.send_photo(message.chat.id, photo,
+                                             f"""Мы нашли Вам человека, который тоже хочет сходить в {message.text}, напишите: @{i[2]}""",
+                                             reply_markup=types.ReplyKeyboardRemove())
+                        photo.close()
+                        photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
+                        await bot.send_photo(i[0], photo,
+                                             f"""Мы нашли Вам человека, который тоже хочет сходить в {message.text}, напишите: @{data[8]}""",
+                                             reply_markup=types.ReplyKeyboardRemove())
+
+                        photo.close()
+                        del in_queue[i[0]]
+                        queue_search[arr_search[3]].remove(i)
+                        del in_queue[message.chat.id]
+                        return
+                print(queue_search, arr_search[3])
+                queue_search[arr_search[3]].append([message.chat.id, message.text, data[8]])
+                keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton(text="Отмена"))
+                await bot.send_message(message.chat.id, 'Вы добавлены в очередь', reply_markup=keyboard)
+            else:
+                keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton(text="Отмена"))
+                await bot.send_message(message.chat.id, 'Вы уже в очереди', reply_markup=keyboard)
 
 
     elif message.text == "Отмена":
@@ -259,12 +315,20 @@ async def text(message):
                             queue_search[arr_search[2]].remove(i)
                             del in_queue[message.chat.id]
 
+                elif in_queue[message.chat.id][-1] == 3:
+                    for i in queue_search[arr_search[3]]:
+                        if i[0] == message.chat.id:
+                            queue_search[arr_search[3]].remove(i)
+                            del in_queue[message.chat.id]
+
+                print(queue_search, in_queue)
                 await bot.send_message(message.chat.id, 'Вы удалены из очереди',
                                        reply_markup=types.ReplyKeyboardRemove())
                 await menuSearch(message)
 
             else:
                 await bot.send_message(message.chat.id, 'Вас нет в очереди', reply_markup=types.ReplyKeyboardRemove())
+                await menuSearch(message)
 
 
 
@@ -287,8 +351,27 @@ async def text(message):
 
     elif message.text == "↩️Назад↩️":
         keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-        for i in list(arr_hobby) + ["✅Готово✅"]:
+        for i in list(arr_hobby) + ["⭐️Разное⭐️", "✅Готово✅"]:
             keyboard.add(KeyboardButton(text=i))
+
+        await bot.send_message(message.chat.id, 'Выбери свои интересы', reply_markup=keyboard)
+
+    elif message.text == "⭐️Разное⭐️":
+        keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+        for i in list(arr_varia) + ["↩️Назад↩️"]:
+            keyboard.add(KeyboardButton(text=i))
+
+        await bot.send_message(message.chat.id, 'Выбери свои интересы', reply_markup=keyboard)
+
+    elif message.text in list(arr_varia):
+        keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+        for i in arr_varia[message.text] + ["↩️Назад↩️"]:
+            keyboard.add(KeyboardButton(text=i))
+
+        if message.text == list(arr_varia)[2]:
+            media_group = [types.InputMediaPhoto(media=open(image_path, 'rb')) for image_path in
+                           ["hobby/Мем 1.jpg", "hobby/Мем 2.jpg", "hobby/Мем 3.jpg", "hobby/Мем 4.jpg"]]
+            await bot.send_media_group(chat_id=message.chat.id, media=media_group)
 
         await bot.send_message(message.chat.id, 'Выбери свои интересы', reply_markup=keyboard)
 
@@ -302,7 +385,7 @@ async def text(message):
             reg_user[message.chat.id]["name"] = message.text
 
             keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-            for i in list(arr_hobby) + ["✅Готово✅"]:
+            for i in list(arr_hobby) + ["⭐️Разное⭐️", "✅Готово✅"]:
                 keyboard.add(KeyboardButton(text=i))
 
             await bot.send_message(message.chat.id, 'Выбери свои интересы', reply_markup=keyboard)
@@ -314,7 +397,7 @@ async def directions(message):
         buttons.append(KeyboardButton(text=i))
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(*buttons)
 
-    await bot.send_message(message.chat.id, 'Выбри специальноть:', reply_markup=keyboard)
+    await bot.send_message(message.chat.id, 'Выбри специальность:', reply_markup=keyboard)
 
 
 async def endRegistration(message):
@@ -409,7 +492,7 @@ async def imageGeneration(message):
     arr_hobby = reg_user[message.chat.id]["hobby"]
     print(arr_hobby)
     for i in range(min(6, len(arr_hobby))):
-        watermark = Image.open(f'hobby/{arr_hobby[i]}.jpeg')
+        watermark = Image.open(f'hobby/{arr_hobby[i]}.jpg')
         out = watermark.resize((300, 200))
         im.paste(out, arr_cord[i])
 
