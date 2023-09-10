@@ -11,6 +11,7 @@ import sqlite3
 from data import *
 import json
 import asyncio
+from PIL import Image, ImageDraw, ImageFont
 
 lock = asyncio.Lock()
 
@@ -141,12 +142,16 @@ async def text(message):
                     async with lock:
                         for i in queue_search[message.text][data[2]]:
                             if i[1] == data[2] and i[2] == data[3] and i[3] == data[4]:
-                                await bot.send_message(message.chat.id,
+                                photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
+                                await bot.send_photo(message.chat.id, photo,
                                                        f"""Мы нашли Вам человека с которым вы можете подготовится к сессии, напишите: @{i[4]}""",
                                                        reply_markup=types.ReplyKeyboardRemove())
-                                await bot.send_message(i[0],
+                                photo.close()
+                                photo = open(f'profile/{i[0]}.jpeg', 'rb')
+                                await bot.send_photo(i[0], photo,
                                                        f"""Мы нашли Вам человека с которым вы можете подготовится к сессии, напишите: @{data[8]}""",
                                                        reply_markup=types.ReplyKeyboardRemove())
+                                photo.close()
 
                                 del in_queue[i[0]]
                                 queue_search[message.text][data[2]].remove(i)
@@ -163,6 +168,40 @@ async def text(message):
                         keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton(text="Отмена"))
                         await bot.send_message(message.chat.id, 'Вы добавлены в очередь', reply_markup=keyboard)
 
+            elif message.text == arr_search[1]:
+                db = sqlite3.connect("user.db")
+                sql = db.cursor()
+
+                sql.execute(f"SELECT * FROM user WHERE id = {int(message.chat.id)}")
+                data = sql.fetchone()
+                in_queue[message.chat.id] = list(data) + [1]
+
+                async with lock:
+                    arr = set(json.loads(data[7]))
+                    for i in queue_search[arr_search[1]]:
+                        if len(set(i[1]) & arr) >= 3:
+                            photo = open(f'profile/{i[0]}.jpeg', 'rb')
+                            await bot.send_photo(message.chat.id, photo,
+                                                 f"""Мы нашли Вам человека с похожими интересами.\n\nОбщие интересы:\n {", ".join(list(set(i[1]) & arr))}\nнапишите: @{i[2]}""",
+                                                 reply_markup=types.ReplyKeyboardRemove())
+                            photo.close()
+                            photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
+                            await bot.send_photo(i[0], photo,
+                                                 f"""Мы нашли Вам человека с похожими интересами.\n\nОбщие интересы:\n {", ".join(list(set(i[1]) & arr))}\nнапишите: @{data[8]}""",
+                                                 reply_markup=types.ReplyKeyboardRemove())
+                            photo.close()
+
+                            del in_queue[i[0]]
+                            queue_search[message.text].remove(i)
+                            del in_queue[message.chat.id]
+                            return
+
+                    queue_search[message.text].append([message.chat.id, json.loads(data[7]), data[8]])
+                    keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton(text="Отмена"))
+                    await bot.send_message(message.chat.id, 'Вы добавлены в очередь', reply_markup=keyboard)
+
+
+
 
             elif message.text == arr_search[2]:
                 db = sqlite3.connect("user.db")
@@ -175,13 +214,17 @@ async def text(message):
                 async with lock:
                     for i in queue_search[arr_search[2]]:
                         if i[1].lower() in data[6].lower() or data[6].lower() in i[1].lower():
-                            await bot.send_message(message.chat.id,
+                            photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
+                            await bot.send_photo(message.chat.id, photo,
                                                    f"""Мы нашли Вам человека из Вашего города, напишите: @{i[2]}""",
                                                    reply_markup=types.ReplyKeyboardRemove())
-                            await bot.send_message(i[0],
+                            photo.close()
+                            photo = open(f'profile/{i[0]}.jpeg', 'rb')
+                            await bot.send_photo(i[0], photo,
                                                    f"""Мы нашли Вам человека из Вашего города, напишите: @{data[8]}""",
                                                    reply_markup=types.ReplyKeyboardRemove())
 
+                            photo.close()
                             del in_queue[i[0]]
                             queue_search[message.text].remove(i)
                             del in_queue[message.chat.id]
@@ -204,6 +247,12 @@ async def text(message):
                             queue_search[arr_search[0]][in_queue[message.chat.id][2]].remove(i)
                             del in_queue[message.chat.id]
 
+                elif in_queue[message.chat.id][-1] == 1:
+                    for i in queue_search[arr_search[1]]:
+                        if i[0] == message.chat.id:
+                            queue_search[arr_search[1]].remove(i)
+                            del in_queue[message.chat.id]
+
                 elif in_queue[message.chat.id][-1] == 2:
                     for i in queue_search[arr_search[2]]:
                         if i[0] == message.chat.id:
@@ -212,6 +261,7 @@ async def text(message):
 
                 await bot.send_message(message.chat.id, 'Вы удалены из очереди',
                                        reply_markup=types.ReplyKeyboardRemove())
+                await menuSearch(message)
 
             else:
                 await bot.send_message(message.chat.id, 'Вас нет в очереди', reply_markup=types.ReplyKeyboardRemove())
@@ -224,8 +274,15 @@ async def text(message):
         else:
             await endRegistration(message)
             reply_markup = types.ReplyKeyboardRemove()
-            await bot.send_message(message.chat.id, 'Вы успешно зарегестрировались', reply_markup=reply_markup)
+            await imageGeneration(message)
+
+            photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
+            await bot.send_photo(message.chat.id, photo, 'Вы успешно зарегестрировались', reply_markup=reply_markup)
+            photo.close()
+
             await menuSearch(message)
+            async with lock:
+                del reg_user[message.chat.id]
 
 
     elif message.text == "↩️Назад↩️":
@@ -239,7 +296,7 @@ async def text(message):
         if "year" in reg_user[message.chat.id] and "city" not in reg_user[message.chat.id]:
             reg_user[message.chat.id]["city"] = message.text
             reply_markup = types.ReplyKeyboardRemove()
-            await bot.send_message(message.chat.id, 'Введите свое имя и фамилию', reply_markup=reply_markup)
+            await bot.send_message(message.chat.id, 'Введите свое имя', reply_markup=reply_markup)
 
         elif "city" in reg_user[message.chat.id] and "name" not in reg_user[message.chat.id]:
             reg_user[message.chat.id]["name"] = message.text
@@ -324,6 +381,41 @@ async def menuSearch(message):
         keyboard.add(KeyboardButton(text=i))
 
     await bot.send_message(message.chat.id, 'Выберите, с какой целью ищите', reply_markup=keyboard)
+
+
+async def imageGeneration(message):
+    im = Image.open('img/пустое.png')
+    font = ImageFont.truetype('font/Molot.otf', size=150)
+    draw_text = ImageDraw.Draw(im)
+    draw_text.text(
+        (50, 25),
+        reg_user[message.chat.id]["name"] + "-" * 100,
+        font=font,
+        fill='#1C0606')
+
+    font = ImageFont.truetype('font/CandaraBold.ttf', size=88)
+    arr_cords = [(800, 300), (800, 370), (870, 520), (790, 600)]
+    arr_names = [reg_user[message.chat.id]["faculty"], reg_user[message.chat.id]["directions"],
+                 reg_user[message.chat.id]["year"], "КУРС"]
+    for i in range(4):
+        draw_text = ImageDraw.Draw(im)
+        draw_text.text(
+            arr_cords[i],
+            arr_names[i],
+            font=font,
+            fill='#1C0606')
+
+    arr_cord = [(52, 230), (52, 489), (52, 746), (450, 230), (450, 487), (450, 744)]
+    arr_hobby = reg_user[message.chat.id]["hobby"]
+    print(arr_hobby)
+    for i in range(min(6, len(arr_hobby))):
+        watermark = Image.open(f'hobby/{arr_hobby[i]}.jpeg')
+        out = watermark.resize((300, 200))
+        im.paste(out, arr_cord[i])
+
+    im = im.convert('RGB')
+
+    im.save(f"profile/{message.chat.id}.jpeg")
 
 
 # запускаем бота
