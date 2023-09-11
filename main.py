@@ -147,6 +147,7 @@ async def text(message):
 
                 if data[2] in queue_search[message.text]:
                     async with lock:
+                        await bot.send_message(message.chat.id, 'Идет поиск')
                         for i in queue_search[message.text][data[2]]:
                             if i[1] == data[2] and i[2] == data[3] and i[3] == data[4]:
                                 response = openai.ChatCompletion.create(
@@ -195,6 +196,7 @@ async def text(message):
                 in_queue[message.chat.id] = list(data) + [1]
 
                 async with lock:
+                    await bot.send_message(message.chat.id, 'Идет поиск')
                     arr = set(json.loads(data[7]))
                     arr_similarity = []
                     sum_similarity = 0
@@ -250,6 +252,7 @@ async def text(message):
                 in_queue[message.chat.id] = list(data) + [2]
 
                 async with lock:
+                    await bot.send_message(message.chat.id, 'Идет поиск')
                     for i in queue_search[arr_search[2]]:
                         if i[1].lower() in data[6].lower() or data[6].lower() in i[1].lower():
                             response = openai.ChatCompletion.create(
@@ -305,6 +308,7 @@ async def text(message):
         async with lock:
             if message.chat.id not in in_queue:
                 in_queue[message.chat.id] = list(data) + [3]
+                await bot.send_message(message.chat.id, 'Идет поиск')
 
                 for i in queue_search[arr_search[3]]:
                     if i[1] == message.text:
