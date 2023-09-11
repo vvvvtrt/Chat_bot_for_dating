@@ -62,7 +62,7 @@ async def start_command(message: types.Message):
 
         await message.reply(
             'Привет! \nДанный бот поможет завести тебе новые знакомства, провести хорошо время или подготовится к экзаменам')
-        await bot.send_message(message.chat.id, 'Выбри свой факультет:', reply_markup=keyboard)
+        await bot.send_message(message.chat.id, 'Выберите свой факультет:', reply_markup=keyboard)
     else:
         await menuSearch(message)
 
@@ -99,7 +99,7 @@ async def text(message):
             buttons.append(KeyboardButton(text=i))
         keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(*buttons)
 
-        await bot.send_message(message.chat.id, 'Выбри ступень:', reply_markup=keyboard)
+        await bot.send_message(message.chat.id, 'Выберите ступень:', reply_markup=keyboard)
 
     elif message.text in arr_degree:
         reg_user[message.chat.id]["degree"] = message.text
@@ -122,7 +122,7 @@ async def text(message):
         for i in list(arr_hobby[message.text]) + ["↩️Назад↩️"]:
             keyboard.add(KeyboardButton(text=i))
 
-        await bot.send_message(message.chat.id, 'Выбери свои интересы', reply_markup=keyboard)
+        await bot.send_message(message.chat.id, 'Выберите свои интересы', reply_markup=keyboard)
 
     elif message.text in list_hobby + list_varia:
         if "hobby" not in reg_user[message.chat.id]:
@@ -151,13 +151,14 @@ async def text(message):
                                 await bot.send_photo(message.chat.id, photo,
                                                      f"""Мы нашли Вам человека с которым вы можете подготовится к сессии, напишите: @{i[4]}""",
                                                      reply_markup=types.ReplyKeyboardRemove())
+                                await bot.send_message(message.chat.id, 'Чтобы вернутся в меню: /menu')
                                 photo.close()
                                 photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
                                 await bot.send_photo(i[0], photo,
                                                      f"""Мы нашли Вам человека с которым вы можете подготовится к сессии, напишите: @{data[8]}""",
                                                      reply_markup=types.ReplyKeyboardRemove())
                                 photo.close()
-
+                                await bot.send_message(i[0], 'Чтобы вернутся в меню: /menu')
                                 del in_queue[i[0]]
                                 queue_search[message.text][data[2]].remove(i)
                                 del in_queue[message.chat.id]
@@ -195,11 +196,13 @@ async def text(message):
                         await bot.send_photo(message.chat.id, photo,
                                              f"""Мы нашли Вам человека с похожими интересами.\n\nОбщие интересы:\n {', '.join(list(set(arr_similarity[1]) & arr))}\nнапишите: @{arr_similarity[2]}""",
                                              reply_markup=types.ReplyKeyboardRemove())
+                        await bot.send_message(message.chat.id, 'Чтобы вернутся в меню: /menu')
                         photo.close()
                         photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
                         await bot.send_photo(arr_similarity[0], photo,
                                              f"""Мы нашли Вам человека с похожими интересами.\n\nОбщие интересы:\n {", ".join(list(set(arr_similarity[1]) & arr))}\nнапишите: @{data[8]}""",
                                              reply_markup=types.ReplyKeyboardRemove())
+                        await bot.send_message(arr_similarity[0], 'Чтобы вернутся в меню: /menu')
                         photo.close()
 
                         del in_queue[arr_similarity[0]]
@@ -230,11 +233,13 @@ async def text(message):
                             await bot.send_photo(message.chat.id, photo,
                                                  f"""Мы нашли Вам человека из Вашего родного города, напишите: @{i[2]}""",
                                                  reply_markup=types.ReplyKeyboardRemove())
+                            await bot.send_message(message.chat.id, 'Чтобы вернутся в меню: /menu')
                             photo.close()
                             photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
                             await bot.send_photo(i[0], photo,
                                                  f"""Мы нашли Вам человека из Вашего родного города, напишите: @{data[8]}""",
                                                  reply_markup=types.ReplyKeyboardRemove())
+                            await bot.send_message(i[0], 'Чтобы вернутся в меню: /menu')
 
                             photo.close()
                             del in_queue[i[0]]
@@ -274,11 +279,13 @@ async def text(message):
                         await bot.send_photo(message.chat.id, photo,
                                              f"""Мы нашли Вам человека, который тоже хочет сходить в {message.text}, напишите: @{i[2]}""",
                                              reply_markup=types.ReplyKeyboardRemove())
+                        await bot.send_message(message.chat.id, 'Чтобы вернутся в меню: /menu')
                         photo.close()
                         photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
                         await bot.send_photo(i[0], photo,
                                              f"""Мы нашли Вам человека, который тоже хочет сходить в {message.text}, напишите: @{data[8]}""",
                                              reply_markup=types.ReplyKeyboardRemove())
+                        await bot.send_message(i[0], 'Чтобы вернутся в меню: /menu')
 
                         photo.close()
                         del in_queue[i[0]]
@@ -397,7 +404,7 @@ async def directions(message):
         buttons.append(KeyboardButton(text=i))
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(*buttons)
 
-    await bot.send_message(message.chat.id, 'Выбри специальность:', reply_markup=keyboard)
+    await bot.send_message(message.chat.id, 'Выберите специальность:', reply_markup=keyboard)
 
 
 async def endRegistration(message):
@@ -463,7 +470,7 @@ async def menuSearch(message):
     for i in arr_search:
         keyboard.add(KeyboardButton(text=i))
 
-    await bot.send_message(message.chat.id, 'Выберите, с какой целью ищите', reply_markup=keyboard)
+    await bot.send_message(message.chat.id, 'Выберите, с какой целью ищете', reply_markup=keyboard)
 
 
 async def imageGeneration(message):
