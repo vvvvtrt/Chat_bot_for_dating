@@ -12,6 +12,7 @@ from data import *
 import json
 import asyncio
 from PIL import Image, ImageDraw, ImageFont
+import openai
 
 lock = asyncio.Lock()
 
@@ -22,6 +23,7 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=token)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
+openai.api_key = token_ai
 
 reg_user = {}
 queue_search = {"Подготовка к сессии": {}, "Поиск по интересам": [], "Поиск по родному городу": [],
@@ -147,15 +149,25 @@ async def text(message):
                     async with lock:
                         for i in queue_search[message.text][data[2]]:
                             if i[1] == data[2] and i[2] == data[3] and i[3] == data[4]:
+                                response = openai.ChatCompletion.create(
+                                    model="gpt-3.5-turbo",
+                                    messages=[
+                                        {"role": "user",
+                                         "content": f"Как начать диолог коротко в социальных сетях используя в каждом знакмстве только 1 интерес, и выведи не более 5 пунктов для начала диалога, если у нас общие интересы: подготовка к сессии"}
+                                    ]
+                                )
+
+                                text_ai = response['choices'][0]['message']['content']
+
                                 photo = open(f'profile/{i[0]}.jpeg', 'rb')
                                 await bot.send_photo(message.chat.id, photo,
-                                                     f"""Мы нашли Вам человека с которым вы можете подготовится к сессии, напишите: @{i[4]}""",
+                                                     f"""Мы нашли Вам человека с которым вы можете подготовится к сессии\nСовет от искуственного интелекта, как начать диалог:\n {text_ai}\nнапишите: @{i[4]}""",
                                                      reply_markup=types.ReplyKeyboardRemove())
                                 await bot.send_message(message.chat.id, 'Чтобы вернутся в меню: /menu')
                                 photo.close()
                                 photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
                                 await bot.send_photo(i[0], photo,
-                                                     f"""Мы нашли Вам человека с которым вы можете подготовится к сессии, напишите: @{data[8]}""",
+                                                     f"""Мы нашли Вам человека с которым вы можете подготовится к сессии\nСовет от искуственного интелекта, как начать диалог:\n {text_ai}\nнапишите: @{data[8]}""",
                                                      reply_markup=types.ReplyKeyboardRemove())
                                 photo.close()
                                 await bot.send_message(i[0], 'Чтобы вернутся в меню: /menu')
@@ -192,15 +204,26 @@ async def text(message):
                             sum_similarity = len(set(i[1]) & arr)
 
                     if sum_similarity:
+                        response = openai.ChatCompletion.create(
+                            model="gpt-3.5-turbo",
+                            messages=[
+                                {"role": "user",
+                                 "content": f"Как начать диолог коротко в социальных сетях используя в каждом знакмстве только 1 интерес, и выведи не более 5 пунктов для начала диалога, если у нас общие интересы: {', '.join(list(set(arr_similarity[1]) & arr))}"}
+                            ]
+                        )
+
+
+                        text_ai = response['choices'][0]['message']['content']
+
                         photo = open(f'profile/{arr_similarity[0]}.jpeg', 'rb')
                         await bot.send_photo(message.chat.id, photo,
-                                             f"""Мы нашли Вам человека с похожими интересами.\n\nОбщие интересы:\n {', '.join(list(set(arr_similarity[1]) & arr))}\nнапишите: @{arr_similarity[2]}""",
+                                             f"""Мы нашли Вам человека с похожими интересами.\n\nОбщие интересы:\n {', '.join(list(set(arr_similarity[1]) & arr))}\n\nСовет от искуственного интелекта, как начать диалог:\n {text_ai}\nнапишите: @{arr_similarity[2]}""",
                                              reply_markup=types.ReplyKeyboardRemove())
                         await bot.send_message(message.chat.id, 'Чтобы вернутся в меню: /menu')
                         photo.close()
                         photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
                         await bot.send_photo(arr_similarity[0], photo,
-                                             f"""Мы нашли Вам человека с похожими интересами.\n\nОбщие интересы:\n {", ".join(list(set(arr_similarity[1]) & arr))}\nнапишите: @{data[8]}""",
+                                             f"""Мы нашли Вам человека с похожими интересами.\n\nОбщие интересы:\n {", ".join(list(set(arr_similarity[1]) & arr))}\n\nСовет от искуственного интелекта, как начать диалог:\n {text_ai}\nнапишите: @{data[8]}""",
                                              reply_markup=types.ReplyKeyboardRemove())
                         await bot.send_message(arr_similarity[0], 'Чтобы вернутся в меню: /menu')
                         photo.close()
@@ -229,15 +252,25 @@ async def text(message):
                 async with lock:
                     for i in queue_search[arr_search[2]]:
                         if i[1].lower() in data[6].lower() or data[6].lower() in i[1].lower():
+                            response = openai.ChatCompletion.create(
+                                model="gpt-3.5-turbo",
+                                messages=[
+                                    {"role": "user",
+                                     "content": f"Как начать диолог коротко в социальных сетях используя в каждом знакмстве только 1 интерес, и выведи не более 5 пунктов для начала диалога, если у нас общие интересы: родной город {i[1]}"}
+                                ]
+                            )
+
+                            text_ai = response['choices'][0]['message']['content']
+
                             photo = open(f'profile/{i[0]}.jpeg', 'rb')
                             await bot.send_photo(message.chat.id, photo,
-                                                 f"""Мы нашли Вам человека из Вашего родного города, напишите: @{i[2]}""",
+                                                 f"""Мы нашли Вам человека из Вашего родного города\nСовет от искуственного интелекта, как начать диалог:\n {text_ai}\n напишите: @{i[2]}""",
                                                  reply_markup=types.ReplyKeyboardRemove())
                             await bot.send_message(message.chat.id, 'Чтобы вернутся в меню: /menu')
                             photo.close()
                             photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
                             await bot.send_photo(i[0], photo,
-                                                 f"""Мы нашли Вам человека из Вашего родного города, напишите: @{data[8]}""",
+                                                 f"""Мы нашли Вам человека из Вашего родного города\nСовет от искуственного интелекта, как начать диалог:\n {text_ai}\n напишите: @{data[8]}""",
                                                  reply_markup=types.ReplyKeyboardRemove())
                             await bot.send_message(i[0], 'Чтобы вернутся в меню: /menu')
 
@@ -275,15 +308,25 @@ async def text(message):
 
                 for i in queue_search[arr_search[3]]:
                     if i[1] == message.text:
+                        response = openai.ChatCompletion.create(
+                            model="gpt-3.5-turbo",
+                            messages=[
+                                {"role": "user",
+                                 "content": f"Как начать диолог коротко в социальных сетях используя в каждом знакмстве только 1 интерес, и выведи не более 5 пунктов для начала диалога, если у нас общие интересы: сходить в {message.text}"}
+                            ]
+                        )
+
+                        text_ai = response['choices'][0]['message']['content']
+
                         photo = open(f'profile/{i[0]}.jpeg', 'rb')
                         await bot.send_photo(message.chat.id, photo,
-                                             f"""Мы нашли Вам человека, который тоже хочет сходить в {message.text}, напишите: @{i[2]}""",
+                                             f"""Мы нашли Вам человека, который тоже хочет сходить в {message.text}\nСовет от искуственного интелекта, как начать диалог:\n {text_ai}\nнапишите: @{i[2]}""",
                                              reply_markup=types.ReplyKeyboardRemove())
                         await bot.send_message(message.chat.id, 'Чтобы вернутся в меню: /menu')
                         photo.close()
                         photo = open(f'profile/{message.chat.id}.jpeg', 'rb')
                         await bot.send_photo(i[0], photo,
-                                             f"""Мы нашли Вам человека, который тоже хочет сходить в {message.text}, напишите: @{data[8]}""",
+                                             f"""Мы нашли Вам человека, который тоже хочет сходить в {message.text}\nСовет от искуственного интелекта, как начать диалог:\n {text_ai}\nнапишите: @{data[8]}""",
                                              reply_markup=types.ReplyKeyboardRemove())
                         await bot.send_message(i[0], 'Чтобы вернутся в меню: /menu')
 
@@ -506,6 +549,7 @@ async def imageGeneration(message):
     im = im.convert('RGB')
 
     im.save(f"profile/{message.chat.id}.jpeg")
+
 
 
 # запускаем бота
